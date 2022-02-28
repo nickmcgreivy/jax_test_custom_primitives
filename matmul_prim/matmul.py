@@ -8,6 +8,10 @@ from jax.config import config
 # config.update("jax_enable_x64", True)
 
 
+
+
+
+
 matmul_p = core.Primitive("matmul")  # Create the primitive
 
 for _name, _value in custom_call_matmul.registrations().items():
@@ -54,9 +58,17 @@ def matmul_xla_translation(c, xc, yc):
     return xla_client.ops.CustomCallWithLayout(
         c,
         op_name,
-        operands=(xc, yc),
+        operands=(xc, yc, 
+            xla_client.ops.ConstantLiteral(c, xc_dims[0]),
+            xla_client.ops.ConstantLiteral(c, xc_dims[1]),
+            xla_client.ops.ConstantLiteral(c, yc_dims[1])),
         shape_with_layout=out_shape,
-        operand_shapes_with_layout=(xc_shape, yc_shape),
+        operand_shapes_with_layout=(xc_shape, 
+            yc_shape,
+            xla_client.Shape.array_shape(jnp.dtype(jnp.int64), (), ()),
+            xla_client.Shape.array_shape(jnp.dtype(jnp.int64), (), ()),
+            xla_client.Shape.array_shape(jnp.dtype(jnp.int64), (), ()),
+            ),
     )
 
 
@@ -64,9 +76,9 @@ matmul_p.def_impl(matmul_impl)
 matmul_p.def_abstract_eval(matmul_abstract_eval)
 xla.backend_specific_translations["cpu"][matmul_p] = matmul_xla_translation
 
-x = jnp.ones((5, 10))
-y = jnp.ones((10, 5))
+x = jnp.ones((2, 3))
+y = jnp.ones((3, 4))
 
 res = matmul_prim(x, y)
 jit_res = jit(matmul_prim)(x, y)
-print("Result {} Expected {}".format(jit_res, res))
+print("Result {} \nExpected {}".format(jit_res, res))
