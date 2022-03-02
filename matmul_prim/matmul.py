@@ -8,10 +8,6 @@ from jax.config import config
 # config.update("jax_enable_x64", True)
 
 
-
-
-
-
 matmul_p = core.Primitive("matmul")  # Create the primitive
 
 for _name, _value in custom_call_matmul.registrations().items():
@@ -79,6 +75,17 @@ xla.backend_specific_translations["cpu"][matmul_p] = matmul_xla_translation
 x = jnp.ones((2, 3))
 y = jnp.ones((3, 4))
 
+f = jit(matmul_prim)
+
 res = matmul_prim(x, y)
-jit_res = jit(matmul_prim)(x, y)
-print("Result {} \nExpected {}".format(jit_res, res))
+jit_res = f(x, y)
+jit_res2 = f(x, y)
+f = jit(matmul_prim)
+jit_res3 = f(x, y)
+
+print(res)
+print(jit_res)
+print(jit_res2)
+print(jit_res3)
+
+#print("Result {} \nExpected {}".format(jit_res, res))
