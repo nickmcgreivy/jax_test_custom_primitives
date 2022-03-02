@@ -15,46 +15,46 @@ using Eigen::VectorX;
 
 template <typename T>
 void sparse_solve(void* out_ptr, void** data_ptr) {
+	// Solves Mx=b where M is sparse
 	T* b_ptr = reinterpret_cast<T *>(data_ptr[0]);
   T* sparse_data_ptr = reinterpret_cast<T *>(data_ptr[1]);
   int* sparse_indices_ptr = reinterpret_cast<int *>(data_ptr[2]);    
-  const int N_global = *reinterpret_cast<const int *>(data_ptr[3]);
-  const std::int64_t V_size = *reinterpret_cast<const std::int64_t *>(data_ptr[4]);
+  const int M_size = *reinterpret_cast<const int *>(data_ptr[3]);
+  const std::int64_t nnz = *reinterpret_cast<const std::int64_t *>(data_ptr[4]);
   const bool forward = *reinterpret_cast<const bool *>(data_ptr[5]);
-  VectorX<T> V_data = Map<const VectorX<T>>(sparse_data_ptr, V_size);
-  MatrixXi V_indices = Map<const MatrixXi>(sparse_indices_ptr, V_size, 2);
+  VectorX<T> M_data = Map<const VectorX<T>>(sparse_data_ptr, nnz);
+  MatrixXi M_indices = Map<const MatrixXi>(sparse_indices_ptr, nnz, 2);
 
-  static int prev_N_global = 0;
+  static int prev_M_size = 0;
   static Eigen::SimplicialLDLT<Eigen::SparseMatrix<T>> forwardsolver;
   static Eigen::SimplicialLDLT<Eigen::SparseMatrix<T>> backwardsolver;
 
-  if (N_global == prev_N_global) { 
+  if (M_size == prev_M_size) { 
   	// do nothing
   } else {
 	  // create matrix, create solver, and analyze it
 	  std::vector<Eigen::Triplet<T>> tripletList;
-	  tripletList.reserve(V_size);
-	  for (int i = 0; i < V_size; ++i) {
-	    tripletList.push_back(Eigen::Triplet<T>(V_indices(i,0),V_indices(i,1),V_data(i)));
+	  tripletList.reserve(nnz);
+	  for (int i = 0; i < nnz; ++i) {
+	    tripletList.push_back(Eigen::Triplet<T>(M_indices(i,0),M_indices(i,1),M_data(i)));
 	  }
-	  Eigen::SparseMatrix<T> V(N_global,N_global);
-	  V.setFromTriplets(tripletList.begin(), tripletList.end());
+	  Eigen::SparseMatrix<T> M(M_size,M_size);
+	  M.setFromTriplets(tripletList.begin(), tripletList.end());
 
-	  prev_N_global = N_global;
+	  prev_M_size = M_size;
 
-	  forwardsolver.analyzePattern(V);
-		forwardsolver.factorize(V);
-
-		backwardsolver.analyzePattern(V.transpose());
-		backwardsolver.factorize(V.transpose());
+	  forwardsolver.analyzePattern(M);
+		forwardsolver.factorize(M);
+		backwardsolver.analyzePattern(M.transpose());
+		backwardsolver.factorize(M.transpose());
 	}
 
-  VectorX<T> b = Map<const VectorX<T>>(b_ptr,N_global);
+  VectorX<T> b = Map<const VectorX<T>>(b_ptr,M_size);
   T* x_ptr = reinterpret_cast<T *>(out_ptr);
   if (forward) {
-  	Map<VectorX<T>>(x_ptr, N_global) = forwardsolver.solve(b);
+  	Map<VectorX<T>>(x_ptr, M_size) = forwardsolver.solve(b);
   } else {
-  	Map<VectorX<T>>(x_ptr, N_global) = backwardsolver.solve(b);
+  	Map<VectorX<T>>(x_ptr, M_size) = backwardsolver.solve(b);
   }
 }
 

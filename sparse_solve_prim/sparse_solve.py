@@ -13,24 +13,24 @@ from jaxlib import xla_client
 
 sparse_solve_p = core.Primitive("sparse_solve")
 
-def sparse_solve_prim(b, sparse_data, sparse_indices, N_global, forward=True):
-    return sparse_solve_p.bind(b, sparse_data, sparse_indices, N_global, forward)
+def sparse_solve_prim(b, sparse_data, sparse_indices, size, forward=True):
+    return sparse_solve_p.bind(b, sparse_data, sparse_indices, size, forward)
 
-def sparse_solve_impl(b, sparse_data, sparse_indices, N_global, forward=True):
+def sparse_solve_impl(b, sparse_data, sparse_indices, size, forward=True):
     raise Exception("Sparse solve prim shouldn't be called except from within JIT")
 
-def sparse_solve_abstract_eval(b, sparse_data, sparse_indices, N_global, forward=True):
+def sparse_solve_abstract_eval(b, sparse_data, sparse_indices, size, forward=True):
     return abstract_arrays.ShapedArray(b.shape, b.dtype)
 
 def sparse_solve_value_and_jvp(primals, tangents):
-    (b, sparse_data, sparse_indices, N_global, forward) = primals
+    (b, sparse_data, sparse_indices, size, forward) = primals
     (bt, _, _, _, _) = tangents
-    primal_out = sparse_solve_prim(b, sparse_data, sparse_indices, N_global, forward=forward)
-    output_tangent = sparse_solve_prim(bt, sparse_data, sparse_indices, N_global, forward=forward)
+    primal_out = sparse_solve_prim(b, sparse_data, sparse_indices, size, forward=forward)
+    output_tangent = sparse_solve_prim(bt, sparse_data, sparse_indices, size, forward=forward)
     return (primal_out, output_tangent)
 
-def sparse_solve_transpose(ct, b, sparse_data, sparse_indices, N_global, forward=True):
-    return (sparse_solve_prim(-ct, sparse_data, sparse_indices, N_global, forward=not forward), None, None, None, None)
+def sparse_solve_transpose(ct, b, sparse_data, sparse_indices, size, forward=True):
+    return (sparse_solve_prim(-ct, sparse_data, sparse_indices, size, forward=not forward), None, None, None, None)
 
 
 import custom_call_sparse_solve
@@ -38,7 +38,7 @@ import custom_call_sparse_solve
 for _name, _value in custom_call_sparse_solve.registrations().items():
     xla_client.register_cpu_custom_call_target(_name, _value)
 
-def sparse_solve_xla_translation(c, bc, sparse_data, sparse_indices, N_global, forward):
+def sparse_solve_xla_translation(c, bc, sparse_data, sparse_indices, size, forward):
     bc_shape = c.get_shape(bc)
     bc_dtype = bc_shape.element_type()
     bc_dims = bc_shape.dimensions()
@@ -67,7 +67,7 @@ def sparse_solve_xla_translation(c, bc, sparse_data, sparse_indices, N_global, f
         operands=(bc,
             sparse_data,
             sparse_indices,
-            N_global,
+            size,
             xla_client.ops.ConstantLiteral(c, data_dims[0]),
             forward,
             ),
